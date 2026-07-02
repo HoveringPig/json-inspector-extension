@@ -18,8 +18,49 @@ export function extractJsonCandidates(input) {
     }));
 }
 
-export function formatJson(value) {
-  return JSON.stringify(value, null, 2);
+export function formatJson(value, options = {}) {
+  return JSON.stringify(value, null, options.compact ? 0 : 2);
+}
+
+export function buildMixedOutputSegments(input) {
+  const text = String(input ?? "");
+  const candidates = extractJsonCandidates(text).sort((a, b) => a.start - b.start);
+  const segments = [];
+  let cursor = 0;
+
+  for (const candidate of candidates) {
+    if (candidate.start > cursor) {
+      segments.push({
+        type: "text",
+        text: text.slice(cursor, candidate.start),
+      });
+    }
+
+    segments.push({
+      type: "json",
+      candidate,
+    });
+    cursor = candidate.end;
+  }
+
+  if (cursor < text.length || segments.length === 0) {
+    segments.push({
+      type: "text",
+      text: text.slice(cursor),
+    });
+  }
+
+  return segments.filter((segment) => segment.type === "json" || segment.text.length > 0);
+}
+
+export function formatMixedOutput(input, options = {}) {
+  return buildMixedOutputSegments(input)
+    .map((segment) => (segment.type === "json" ? formatJson(segment.candidate.parsed, options) : segment.text))
+    .join("");
+}
+
+export function shouldMarkRawTextLine(text) {
+  return String(text ?? "").trim().length > 0;
 }
 
 export function deepParseJsonStrings(value) {

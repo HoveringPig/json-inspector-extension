@@ -4,7 +4,7 @@
 
 ## Goal
 
-Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy log text, renders formatted output, supports candidate switching, and lets users inspect nested JSON strings without changing the original JSON structure.
+Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy log text, renders source-order mixed output, and lets users inspect nested JSON strings without changing the original JSON structure.
 
 ## Current Status
 
@@ -12,8 +12,10 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 - [x] Extension renamed to `JSON Inspector`.
 - [x] Context menu handoff implemented.
 - [x] Log text JSON extraction implemented.
-- [x] Multiple candidate extraction and ranking implemented.
+- [x] Multiple JSON segment extraction and ranking implemented.
 - [x] Contained candidate filtering implemented.
+- [x] Mixed output rendering implemented: raw text is preserved and JSON segments are formatted inline.
+- [x] Raw non-JSON text markers implemented.
 - [x] Nested JSON string detection implemented.
 - [x] Main output preserves original JSON string values.
 - [x] Field-level nested JSON preview expansion implemented.
@@ -22,8 +24,12 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 - [x] Node-level copy implemented.
 - [x] Full-output copy implemented.
 - [x] Wrap/no-wrap toggle implemented.
+- [x] Minify/pretty output toggle implemented.
+- [x] Classic, Light, and Dark themes implemented.
+- [x] Theme persistence implemented.
+- [x] Clear action moved into the Input header.
 - [x] Fixed full-page layout implemented.
-- [x] Independent scrolling for Input, Output, and Candidates implemented.
+- [x] Independent scrolling for Input and Output implemented.
 - [x] README created with screenshots.
 - [x] Screenshot demo input added.
 - [x] GitHub repository created and made public.
@@ -36,8 +42,8 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 - `src/jsonTools.js`: pure JSON extraction, ranking, formatting, and nested JSON string detection utilities.
 - `src/background.js`: context menu setup and selected-text handoff.
 - `src/formatter.html`: full-page inspector markup.
-- `src/formatter.css`: responsive fixed-height layout and UI styling.
-- `src/formatter.js`: UI state, rendering, folding, wrapping, nested preview expansion, copy actions, and selected-text handoff loading.
+- `src/formatter.css`: responsive fixed-height layout, theme variables, and UI styling.
+- `src/formatter.js`: UI state, mixed output rendering, folding, wrapping, minify/pretty display, theme persistence, nested preview expansion, copy actions, and selected-text handoff loading.
 - `tests/jsonTools.test.js`: parser and formatter tests using Node's built-in test runner.
 - `examples/screenshot-demo-input.txt`: demo input for README screenshots and manual checks.
 - `docs/images/`: README screenshot assets.
@@ -72,13 +78,15 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 
 - [x] Add full-page formatter markup.
 - [x] Add app header with brand, status, and Clear action.
-- [x] Add left column for Input and Candidates.
+- [x] Add left column for Input.
 - [x] Add right column for Output.
 - [x] Use approximately 4:6 left/right ratio.
 - [x] Remove wide-screen max-width so the page uses full viewport width.
 - [x] Keep page fixed-height with no body scrolling.
-- [x] Give Input, Output, and Candidates their own scroll areas.
-- [x] Increase Candidates area height for better visibility.
+- [x] Give Input and Output their own scroll areas.
+- [x] Move Clear action into the Input header.
+- [x] Add Classic, Light, and Dark theme selector.
+- [x] Remember selected theme locally.
 
 ### Phase 4: Output Tree Interactions
 
@@ -90,6 +98,8 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 - [x] Keep nested expansion out of the main text content so drag-copy is not interrupted.
 - [x] Render nested previews with distinct background and left marker.
 - [x] Add wrap/no-wrap output toggle, defaulting to wrap.
+- [x] Add minify/pretty output toggle.
+- [x] Preserve raw text in output with visible markers.
 - [x] Add body-level fixed tooltip for gutter controls so hover text is not clipped.
 
 ### Phase 5: Documentation
@@ -123,7 +133,7 @@ npm test
 Expected result:
 
 ```text
-13 tests pass
+17 tests pass
 0 tests fail
 ```
 
@@ -132,15 +142,17 @@ Expected result:
 - [ ] Load the project as an unpacked Chrome extension from `chrome://extensions`.
 - [ ] Click the extension action and confirm the inspector opens.
 - [ ] Paste `examples/screenshot-demo-input.txt`.
-- [ ] Confirm the first candidate is selected by default.
-- [ ] Confirm two candidates appear.
-- [ ] Switch to the second candidate and confirm output changes.
+- [ ] Confirm raw log text and formatted JSON segments appear together in output.
+- [ ] Confirm non-empty raw text lines have a `TXT` marker.
 - [ ] Expand `nested_object` and confirm the preview is visually marked.
 - [ ] Expand `nested_array` and confirm preview nodes are copyable.
 - [ ] Fold an object or array from the line-number gutter.
 - [ ] Toggle Wrap / No wrap.
+- [ ] Toggle Minify / Pretty.
 - [ ] Copy the full output.
 - [ ] Copy an individual node from the gutter.
+- [ ] Switch Classic, Light, and Dark themes.
+- [ ] Reload and confirm the selected theme is remembered.
 - [ ] Select text on a web page and open it through `Open selection in JSON Inspector`.
 
 ## Known Scope Boundaries

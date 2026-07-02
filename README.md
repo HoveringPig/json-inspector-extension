@@ -2,7 +2,7 @@
 
 JSON Inspector is a lightweight Chrome extension for extracting, formatting, and inspecting JSON copied from logs or selected from web pages.
 
-It is designed for messy engineering workflows: paste a log line, response payload, copied console text, or selected page text, and the extension will find valid JSON candidates, render the selected candidate, and help inspect nested JSON strings without changing the original JSON structure.
+It is designed for messy engineering workflows: paste a log line, response payload, copied console text, or selected page text, and the extension will preserve surrounding raw text while formatting every valid JSON segment it can find. Escaped nested JSON strings can be expanded for inspection without changing the original JSON structure.
 
 ## Screenshots
 
@@ -10,18 +10,20 @@ Expanded nested JSON preview:
 
 ![JSON Inspector expanded nested JSON preview](docs/images/json-inspector-expanded-preview.png)
 
-Candidate switching:
+Additional output state:
 
-![JSON Inspector candidate switching](docs/images/json-inspector-candidate-switching.png)
+![JSON Inspector output state](docs/images/json-inspector-candidate-switching.png)
 
 ## Features
 
 - Extract valid JSON objects and arrays from surrounding log text.
-- Detect multiple JSON candidates in one input and let you switch between them.
-- Format the selected JSON with line numbers, folding, wrapping controls, and node-level copy.
+- Preserve non-JSON text in the output with visible `TXT` markers.
+- Format every detected JSON segment inline in the output.
+- Render output with line numbers, folding, wrapping controls, minify/pretty toggle, and node-level copy.
 - Preserve the original JSON shape by default.
 - Detect string values that contain escaped JSON and provide an inline expand control for separate inspection.
 - Copy any rendered node, including nodes inside expanded nested JSON previews.
+- Switch between Classic, Light, and Dark themes. Theme choice is remembered locally.
 - Open selected text from a web page through the Chrome context menu.
 - Runs locally with plain HTML, CSS, and JavaScript. No backend and no build step.
 
@@ -55,7 +57,7 @@ It includes log text, multiple JSON candidates, nested JSON strings, arrays, pri
 
 Click the extension icon to open the JSON Inspector tab.
 
-Paste logs or JSON into the input pane. JSON Inspector will scan the text, list detected candidates, and render the selected candidate in the output pane.
+Paste logs or JSON into the input pane. JSON Inspector will scan the text and render a source-order output: raw text stays visible, valid JSON objects and arrays are formatted inline.
 
 ### Open selected text
 
@@ -69,9 +71,9 @@ The selected text is passed into the formatter tab automatically.
 
 ### Inspect output
 
-- Use the Candidates panel to switch between extracted JSON fragments.
 - Use line-number gutter controls to fold, expand nested JSON string previews, or copy a node.
-- Use the output header controls to switch line wrapping or copy the full formatted output.
+- Use the output header controls to minify/pretty print, switch line wrapping, or copy the full rendered output.
+- Use the Theme selector to switch between Classic, Light, and Dark.
 
 ## Install Locally
 

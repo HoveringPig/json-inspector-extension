@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildMixedOutputSegments,
   deepParseJsonStrings,
   extractJsonCandidates,
+  formatMixedOutput,
   formatJson,
   parseNestedJsonString,
+  shouldMarkRawTextLine,
 } from "../src/jsonTools.js";
 
 test("extracts a JSON object from log text", () => {
@@ -138,4 +141,35 @@ test("prefers the outer array when it contains nested objects and JSON strings",
   assert.equal(candidate.type, "array");
   assert.equal(candidate.parsed[0].dataset_id, '{"a":"1"}');
   assert.deepEqual(parseNestedJsonString(candidate.parsed[0].dataset_id), { a: "1" });
+});
+
+test("builds mixed output segments in source order", () => {
+  const input = 'first {"ok":true} middle [1,2] tail';
+  const segments = buildMixedOutputSegments(input);
+
+  assert.deepEqual(segments.map((segment) => segment.type), ["text", "json", "text", "json", "text"]);
+  assert.equal(segments[0].text, "first ");
+  assert.deepEqual(segments[1].candidate.parsed, { ok: true });
+  assert.equal(segments[2].text, " middle ");
+  assert.deepEqual(segments[3].candidate.parsed, [1, 2]);
+  assert.equal(segments[4].text, " tail");
+});
+
+test("formats mixed output while preserving raw non-json text", () => {
+  const input = 'INFO payload={"ok":true} tail {not-json}';
+
+  assert.equal(formatMixedOutput(input), 'INFO payload={\n  "ok": true\n} tail {not-json}');
+});
+
+test("formats mixed output in compact mode", () => {
+  const input = 'INFO payload={"ok":true,"items":[1,2]} tail {not-json}';
+
+  assert.equal(formatMixedOutput(input, { compact: true }), 'INFO payload={"ok":true,"items":[1,2]} tail {not-json}');
+});
+
+test("marks only visible raw text lines", () => {
+  assert.equal(shouldMarkRawTextLine("plain text"), true);
+  assert.equal(shouldMarkRawTextLine("{not-json}"), true);
+  assert.equal(shouldMarkRawTextLine(""), false);
+  assert.equal(shouldMarkRawTextLine("   "), false);
 });

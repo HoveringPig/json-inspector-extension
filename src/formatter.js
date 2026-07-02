@@ -1,17 +1,23 @@
 import {
+  buildMixedOutputSegments,
   extractJsonCandidates,
+  formatMixedOutput,
   formatJson,
   parseNestedJsonString,
+  shouldMarkRawTextLine,
 } from "./jsonTools.js";
 
 const HANDOFF_KEY = "selectedText";
+const THEME_STORAGE_KEY = "jsonInspectorTheme";
+const THEMES = new Set(["classic", "light", "dark"]);
 
 const state = {
   candidates: [],
-  selectedId: "",
   expandedPaths: new Set(),
   collapsedPaths: new Set(),
   wrapLines: true,
+  compactOutput: false,
+  theme: "classic",
   copyResetTimer: 0,
   gutterTooltip: null,
 };
@@ -22,15 +28,17 @@ const elements = {
   outputText: document.querySelector("#outputText"),
   statusText: document.querySelector("#statusText"),
   candidateCount: document.querySelector("#candidateCount"),
-  candidateList: document.querySelector("#candidateList"),
+  minifyButton: document.querySelector("#minifyButton"),
   wrapButton: document.querySelector("#wrapButton"),
   copyButton: document.querySelector("#copyButton"),
   clearButton: document.querySelector("#clearButton"),
+  themeSelect: document.querySelector("#themeSelect"),
 };
 
 init();
 
 async function init() {
+  loadThemePreference();
   bindEvents();
   await loadSelectedTextHandoff();
   refreshFromInput();
@@ -40,11 +48,53 @@ async function init() {
 
 function bindEvents() {
   elements.inputText.addEventListener("input", refreshFromInput);
+  elements.themeSelect.addEventListener("change", () => updateTheme(elements.themeSelect.value));
+  elements.minifyButton.addEventListener("click", toggleCompactOutput);
   elements.wrapButton.addEventListener("click", toggleWrapLines);
   elements.copyButton.addEventListener("click", copyOutput);
   elements.clearButton.addEventListener("click", clearAll);
   elements.outputText.addEventListener("scroll", hideGutterTooltip);
   window.addEventListener("resize", hideGutterTooltip);
+}
+
+function loadThemePreference() {
+  let savedTheme = "classic";
+
+  try {
+    savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "classic";
+  } catch {
+    savedTheme = "classic";
+  }
+
+  applyTheme(savedTheme);
+
+  if (savedTheme !== state.theme) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+    } catch {
+      // Ignore storage failures; the normalized theme is already applied.
+    }
+  }
+}
+
+function updateTheme(theme) {
+  applyTheme(theme);
+
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+  } catch {
+    // Theme choice still applies for the current page even when storage is unavailable.
+  }
+}
+
+function applyTheme(theme) {
+  const nextTheme = THEMES.has(theme) ? theme : "classic";
+  state.theme = nextTheme;
+  document.documentElement.dataset.theme = nextTheme;
+
+  if (elements.themeSelect) {
+    elements.themeSelect.value = nextTheme;
+  }
 }
 
 async function loadSelectedTextHandoff() {
@@ -69,14 +119,6 @@ async function loadSelectedTextHandoff() {
 
 function refreshFromInput() {
   state.candidates = extractJsonCandidates(elements.inputText.value);
-  state.selectedId = state.candidates[0]?.id || "";
-  state.expandedPaths.clear();
-  state.collapsedPaths.clear();
-  render();
-}
-
-function selectCandidate(candidateId) {
-  state.selectedId = candidateId;
   state.expandedPaths.clear();
   state.collapsedPaths.clear();
   render();
@@ -84,7 +126,7 @@ function selectCandidate(candidateId) {
 
 function render() {
   renderInputMeta();
-  renderCandidates();
+  renderOutputMeta();
   renderOutput();
   updateButtonStates();
 }
@@ -94,57 +136,26 @@ function renderInputMeta() {
   elements.inputMeta.textContent = `${count.toLocaleString()} char${count === 1 ? "" : "s"}`;
 }
 
-function renderCandidates() {
-  elements.candidateCount.textContent = `${state.candidates.length} candidate${state.candidates.length === 1 ? "" : "s"}`;
-  elements.candidateList.textContent = "";
-
-  if (state.candidates.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "meta";
-    empty.textContent = "No candidates";
-    elements.candidateList.append(empty);
-    return;
-  }
-
-  for (const candidate of state.candidates) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "candidate-card";
-    button.classList.toggle("active", candidate.id === state.selectedId);
-    button.addEventListener("click", () => selectCandidate(candidate.id));
-
-    const title = document.createElement("strong");
-    title.textContent = candidate.summary;
-
-    const meta = document.createElement("span");
-    meta.textContent = `${candidate.type} / ${candidate.end - candidate.start} chars`;
-
-    button.append(title, meta);
-    elements.candidateList.append(button);
-  }
+function renderOutputMeta() {
+  elements.candidateCount.textContent = `${state.candidates.length} JSON`;
 }
 
 function renderOutput() {
   hideGutterTooltip();
-  const selected = getSelectedCandidate();
+  const input = elements.inputText.value;
 
-  if (!elements.inputText.value.trim()) {
+  if (!input.trim()) {
     setStatus("Ready", "ready");
     elements.outputText.replaceChildren();
     return;
   }
 
-  if (!selected) {
-    setStatus("No valid JSON", "error");
-    elements.outputText.replaceChildren();
-    return;
-  }
-
   try {
-    setStatus(selected.summary, "success");
+    const jsonCount = state.candidates.length;
+    setStatus(jsonCount ? `${jsonCount} JSON segment${jsonCount === 1 ? "" : "s"}` : "No valid JSON", jsonCount ? "success" : "warning");
     elements.outputText.classList.toggle("wrap-lines", state.wrapLines);
     elements.outputText.classList.toggle("no-wrap-lines", !state.wrapLines);
-    elements.outputText.replaceChildren(renderJsonViewer(selected.parsed));
+    elements.outputText.replaceChildren(renderMixedOutputViewer(input));
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Render failed", "error");
     elements.outputText.replaceChildren();
@@ -157,13 +168,8 @@ function setStatus(message, tone) {
   elements.statusText.classList.add(tone);
 }
 
-function getSelectedCandidate() {
-  return state.candidates.find((candidate) => candidate.id === state.selectedId) || null;
-}
-
 async function copyOutput() {
-  const selected = getSelectedCandidate();
-  const text = selected ? formatJson(selected.parsed) : "";
+  const text = elements.inputText.value ? formatMixedOutput(elements.inputText.value, { compact: state.compactOutput }) : "";
 
   if (!text) {
     return;
@@ -181,7 +187,6 @@ async function copyOutput() {
 function clearAll() {
   elements.inputText.value = "";
   state.candidates = [];
-  state.selectedId = "";
   state.expandedPaths.clear();
   state.collapsedPaths.clear();
   render();
@@ -194,12 +199,57 @@ function toggleWrapLines() {
   updateButtonStates();
 }
 
+function toggleCompactOutput() {
+  state.compactOutput = !state.compactOutput;
+  state.expandedPaths.clear();
+  state.collapsedPaths.clear();
+  renderOutput();
+  updateButtonStates();
+}
+
 function renderJsonViewer(value) {
   const viewer = document.createElement("div");
   viewer.className = "json-lines";
-  let lineNumber = 1;
+  const lineState = { number: 1 };
+  const appendLine = createLineAppender(viewer, lineState);
 
-  const appendLine = (depth, content, className = "", controls = {}) => {
+  renderValueLines(value, 0, "$", "", "", appendLine);
+  return viewer;
+}
+
+function renderMixedOutputViewer(input) {
+  const viewer = document.createElement("div");
+  viewer.className = "json-lines mixed-output-lines";
+  const lineState = { number: 1 };
+  const appendLine = createLineAppender(viewer, lineState);
+
+  buildMixedOutputSegments(input).forEach((segment, index) => {
+    if (segment.type === "json") {
+      if (state.compactOutput) {
+        renderCompactJsonSegment(segment.candidate, index, appendLine);
+      } else {
+        renderValueLines(segment.candidate.parsed, 0, `$segment${index}`, "", "", appendLine);
+      }
+      return;
+    }
+
+    renderTextSegment(segment.text, appendLine);
+  });
+
+  return viewer;
+}
+
+function renderCompactJsonSegment(candidate, index, appendLine) {
+  const line = document.createDocumentFragment();
+  line.append(token(formatJson(candidate.parsed, { compact: true }), "token-string"));
+  appendLine(0, line, "node-line compact-json-line", {
+    fold: spacer("fold-spacer"),
+    copyValue: candidate.parsed,
+  });
+}
+
+function createLineAppender(viewer, lineState) {
+  return (depth, content, className = "", controls = {}) => {
     const row = document.createElement("div");
     row.className = `code-line${className ? ` ${className}` : ""}`;
 
@@ -212,9 +262,9 @@ function renderJsonViewer(value) {
 
     const number = document.createElement("span");
     number.className = "line-number-text";
-    number.textContent = String(lineNumber);
+    number.textContent = String(lineState.number);
     gutter.append(number);
-    lineNumber += 1;
+    lineState.number += 1;
 
     const line = document.createElement("span");
     line.className = "line-content";
@@ -224,9 +274,33 @@ function renderJsonViewer(value) {
     row.append(gutter, line);
     viewer.append(row);
   };
+}
 
-  renderValueLines(value, 0, "$", "", "", appendLine);
-  return viewer;
+function renderTextSegment(text, appendLine) {
+  const lines = text.split("\n");
+
+  lines.forEach((lineText, index) => {
+    if (index === lines.length - 1 && lineText === "") {
+      return;
+    }
+
+    const line = document.createDocumentFragment();
+    line.append(lineText);
+    const marked = shouldMarkRawTextLine(lineText);
+    appendLine(0, line, marked ? "plain-text-line" : "blank-text-line", {
+      fold: marked ? rawTextBadge() : undefined,
+      copyValue: lineText,
+    });
+  });
+}
+
+function rawTextBadge() {
+  const badge = document.createElement("span");
+  badge.className = "raw-text-badge";
+  badge.textContent = "TXT";
+  badge.title = "Raw text";
+  badge.setAttribute("aria-label", "Raw text");
+  return badge;
 }
 
 function renderValueLines(value, depth, path, prefix, suffix, appendLine) {
@@ -538,10 +612,12 @@ function token(text, className) {
 
 function updateButtonStates() {
   const hasInput = Boolean(elements.inputText.value);
-  const hasOutput = Boolean(getSelectedCandidate());
-  elements.copyButton.disabled = !hasOutput;
+  elements.copyButton.disabled = !hasInput;
   elements.clearButton.disabled = !hasInput;
-  elements.wrapButton.disabled = !hasOutput;
+  elements.wrapButton.disabled = !hasInput;
+  elements.minifyButton.disabled = !hasInput;
+  elements.minifyButton.textContent = state.compactOutput ? "Pretty" : "Minify";
+  elements.minifyButton.classList.toggle("active", state.compactOutput);
   elements.wrapButton.textContent = state.wrapLines ? "Wrap" : "No wrap";
   elements.wrapButton.classList.toggle("active", state.wrapLines);
 }
