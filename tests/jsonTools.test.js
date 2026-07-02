@@ -44,3 +44,19 @@ test("skips invalid fragments while keeping valid candidates", () => {
   assert.equal(candidates.length, 1);
   assert.deepEqual(candidates[0].parsed, { status: "ok" });
 });
+
+test("ignores unmatched quotes in surrounding log text", () => {
+  const input = 'INFO unmatched quote " before {"ok":true}';
+  const candidates = extractJsonCandidates(input);
+
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0].parsed, { ok: true });
+});
+
+test("recovers valid candidates after unbalanced invalid fragments", () => {
+  const input = 'bad {noise good {"status":"ok"}';
+  const candidates = extractJsonCandidates(input);
+
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0].parsed, { status: "ok" });
+});

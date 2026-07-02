@@ -1,8 +1,3 @@
-const OPEN_TO_CLOSE = {
-  "{": "}",
-  "[": "]",
-};
-
 const CLOSE_TO_OPEN = {
   "}": "{",
   "]": "[",
@@ -15,6 +10,7 @@ export function extractJsonCandidates(input) {
   return ranges
     .map((range, index) => parseCandidate(text, range, index))
     .filter(Boolean)
+    .filter((candidate, _index, candidates) => !isContainedInAnotherCandidate(candidate, candidates))
     .sort((a, b) => b.score - a.score || a.start - b.start)
     .map((candidate, index) => ({
       ...candidate,
@@ -31,7 +27,6 @@ function findBalancedJsonRanges(text) {
   const stack = [];
   let inString = false;
   let escaped = false;
-  let rangeStart = -1;
 
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
@@ -47,36 +42,38 @@ function findBalancedJsonRanges(text) {
       continue;
     }
 
-    if (char === '"') {
+    if (char === '"' && stack.length > 0) {
       inString = true;
       continue;
     }
 
     if (char === "{" || char === "[") {
-      if (stack.length === 0) {
-        rangeStart = index;
-      }
-      stack.push(char);
+      stack.push({ char, start: index });
       continue;
     }
 
     if (char === "}" || char === "]") {
-      if (stack.length === 0 || stack[stack.length - 1] !== CLOSE_TO_OPEN[char]) {
+      if (stack.length === 0 || stack[stack.length - 1].char !== CLOSE_TO_OPEN[char]) {
         stack.length = 0;
-        rangeStart = -1;
+        inString = false;
+        escaped = false;
         continue;
       }
 
-      stack.pop();
-
-      if (stack.length === 0 && rangeStart !== -1) {
-        ranges.push({ start: rangeStart, end: index + 1 });
-        rangeStart = -1;
-      }
+      const opening = stack.pop();
+      ranges.push({ start: opening.start, end: index + 1 });
     }
   }
 
   return ranges;
+}
+
+function isContainedInAnotherCandidate(candidate, candidates) {
+  return candidates.some((other) => (
+    other !== candidate
+    && other.start <= candidate.start
+    && candidate.end <= other.end
+  ));
 }
 
 function parseCandidate(text, range, index) {
