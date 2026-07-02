@@ -22,6 +22,43 @@ export function formatJson(value) {
   return JSON.stringify(value, null, 2);
 }
 
+export function deepParseJsonStrings(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => deepParseJsonStrings(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, deepParseJsonStrings(item)]),
+    );
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const parsed = parseNestedJsonString(value);
+  return parsed === null ? value : deepParseJsonStrings(parsed);
+}
+
+export function parseNestedJsonString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!looksLikeJsonContainer(trimmed)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+}
+
 function findBalancedJsonRanges(text) {
   const ranges = [];
   let activeScans = [];
@@ -55,6 +92,13 @@ function findBalancedJsonRanges(text) {
   }
 
   return ranges;
+}
+
+function looksLikeJsonContainer(value) {
+  return (
+    (value.startsWith("{") && value.endsWith("}")) ||
+    (value.startsWith("[") && value.endsWith("]"))
+  );
 }
 
 function advanceScan(scan, char) {

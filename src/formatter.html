@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JSON Inspector</title>
+    <link rel="stylesheet" href="./formatter.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">{ }</span>
+          <div>
+            <h1>JSON Inspector</h1>
+            <p id="statusText" class="status-text">Ready</p>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <button id="clearButton" class="button" type="button">Clear</button>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="JSON Inspector workspace">
+        <section class="left-column" aria-label="Input and detected candidates">
+          <section class="pane input-pane">
+            <div class="pane-header">
+              <label for="inputText">Input</label>
+              <span id="inputMeta" class="meta">0 chars</span>
+            </div>
+            <textarea id="inputText" spellcheck="false" placeholder="Paste logs or JSON here"></textarea>
+          </section>
+
+          <aside class="candidate-panel" aria-label="Detected JSON candidates">
+            <div class="candidate-panel-header">
+              <span>Candidates</span>
+            </div>
+            <div id="candidateList" class="candidate-list"></div>
+          </aside>
+        </section>
+
+        <section class="pane output-pane">
+          <div class="pane-header">
+            <span>Output</span>
+            <div class="output-actions">
+              <span id="candidateCount" class="meta">0 candidates</span>
+              <button id="wrapButton" class="button compact active" type="button">Wrap</button>
+              <button id="copyButton" class="button primary compact" type="button">Copy</button>
+            </div>
+          </div>
+          <div id="outputText" class="code-viewer" tabindex="0"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./formatter.js"></script>
+  </body>
+</html>
