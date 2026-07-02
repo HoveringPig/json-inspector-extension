@@ -10,7 +10,7 @@ JSON Inspector should work locally with no backend and no build step. Its core v
 
 - Extension name: `JSON Inspector`
 - Package name: `json-inspector-extension`
-- GitHub repository: `HoveringPig/json-inspector-extension`
+- GitHub repository: `skyward-lab/json-inspector-extension`
 
 ## User Workflows
 

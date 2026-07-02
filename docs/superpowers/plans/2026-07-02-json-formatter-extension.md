@@ -104,7 +104,7 @@ Deliver a no-build Manifest V3 Chrome extension that extracts JSON from noisy lo
 
 ### Phase 6: GitHub Publication
 
-- [x] Create GitHub repository: `HoveringPig/json-inspector-extension`.
+- [x] Create GitHub repository: `skyward-lab/json-inspector-extension`.
 - [x] Push branch: `codex/json-formatter-extension`.
 - [x] Set repository visibility to public.
 - [x] Push README screenshots and demo input.
