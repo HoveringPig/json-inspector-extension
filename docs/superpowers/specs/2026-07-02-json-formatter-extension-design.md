@@ -1,75 +1,120 @@
-# JSON Formatter Chrome Extension Design
+# JSON Inspector Chrome Extension Design
 
 ## Goal
 
-Build a lightweight Manifest V3 Chrome extension for formatting JSON copied from logs or selected from web pages. The extension should work offline, require no build step, and focus on reliable JSON extraction from noisy text plus readable formatting of nested JSON strings.
+Build a lightweight Manifest V3 Chrome extension for extracting, formatting, and inspecting JSON copied from logs or selected from web pages.
+
+JSON Inspector should work locally with no backend and no build step. Its core value is reliable JSON extraction from noisy text, readable formatted output, and safe inspection of nested JSON strings without changing the original JSON structure.
+
+## Current Product Name
+
+- Extension name: `JSON Inspector`
+- Package name: `json-inspector-extension`
+- GitHub repository: `HoveringPig/json-inspector-extension`
 
 ## User Workflows
 
-### Independent formatter tab
+### Independent Inspector Tab
 
-The primary entry is a full-page extension tab. The user can paste log text or JSON-like text into an input pane. The extension scans the text, extracts JSON candidates, selects the most likely candidate by default, and renders a formatted result.
+The primary entry is a full-page extension tab. The user pastes log text, JSON-like text, API payloads, or console output into the input pane. JSON Inspector scans the input, extracts valid JSON candidates, selects the strongest candidate by default, and renders it in the output pane.
 
-### Selected text handoff
+### Selected Text Handoff
 
-When the user selects text on any web page, a context menu item opens the same formatter tab and passes the selected text into it. This supports logs in web consoles, internal platforms, documents, and email-like pages without requiring manual copy and paste.
+When the user selects text on a web page, the context menu item opens the same inspector tab and passes the selected text into it.
+
+The context menu label is:
+
+```text
+Open selection in JSON Inspector
+```
+
+This supports logs in web consoles, internal tools, documents, and email-like pages without requiring manual copy and paste.
+
+### Screenshot And Demo Flow
+
+The project includes a demo input at:
+
+```text
+examples/screenshot-demo-input.txt
+```
+
+It covers log extraction, multiple candidates, primitives, arrays, nested JSON strings, wrapping, folding, node copy, and candidate switching. README screenshots are stored under `docs/images/`.
 
 ## Functional Requirements
 
-- Extract JSON objects and arrays from surrounding log text.
-- Support multiple JSON candidates in the same input.
+- Extract valid JSON objects and arrays from surrounding log text.
+- Support multiple JSON candidates in one input.
 - Default to the highest-confidence candidate while showing all valid candidates.
-- Parse JSON values that are themselves escaped JSON strings.
-- Support two display modes:
-  - Recursive mode: nested JSON strings are expanded into objects or arrays when valid.
-  - Raw mode: original parsed JSON is preserved without recursively expanding string values.
-- Keep malformed nested string values as plain strings instead of failing the whole parse.
+- Filter contained candidates so nested objects inside a larger valid candidate do not overwhelm the candidate list.
+- Preserve the original JSON structure in the main output.
+- Detect string values that contain escaped JSON objects or arrays.
+- Provide per-value expansion for nested JSON strings in the output gutter.
+- Render nested JSON previews with a distinct visual marker.
+- Keep malformed nested string values as plain strings.
+- Render output with line numbers.
+- Support node-level copy for every visible node, including nested preview nodes.
+- Support object/array folding from the line-number gutter.
+- Support output wrapping and no-wrap display modes, defaulting to wrap.
+- Keep the full page fixed-height; input, output, and candidates scroll independently.
 - Show clear empty/error states when no valid JSON candidate can be found.
-- Avoid network requests and avoid reading page contents except user-selected text delivered by the context menu.
+- Avoid network requests and avoid reading page contents except user-selected text delivered through the context menu.
 
 ## Non-Goals
 
 - No server-side storage.
 - No cloud sync.
-- No dependency on npm or bundling for the first version.
-- No full JSON editor or schema validator in the first version.
-- No automatic extraction of page contents without user selection.
+- No automatic page scraping.
+- No full JSON editor.
+- No schema validation.
+- No attempt to repair non-standard JSON with comments, single quotes, or unquoted keys.
+- No automatic conversion of nested JSON strings into objects in the main output.
 
 ## Architecture
 
 The extension uses plain HTML, CSS, and JavaScript:
 
-- `manifest.json`: Manifest V3 metadata, permissions, action, background service worker, and context menu declaration.
-- `background.js`: Creates the context menu and opens the formatter tab with selected text stored in extension storage.
-- `formatter.html`: Full-page formatter UI.
-- `formatter.css`: Layout and visual styling.
-- `formatter.js`: UI state, input handling, candidate selection, and rendering.
-- `jsonTools.js`: Pure parsing utilities for extraction, candidate ranking, recursive JSON string parsing, and stable formatting.
-- `tests/jsonTools.test.js`: Local test coverage for parser behavior.
+- `manifest.json`: Manifest V3 metadata, permissions, action title, and background service worker.
+- `src/background.js`: Creates the context menu and opens the inspector tab with selected text stored in `chrome.storage.session`.
+- `src/formatter.html`: Full-page inspector markup.
+- `src/formatter.css`: Fixed-height two-column layout, compact controls, output tree styling, nested preview styling, and tooltip styling.
+- `src/formatter.js`: UI state, handoff loading, candidate selection, line rendering, folding, wrapping, nested preview expansion, and copy actions.
+- `src/jsonTools.js`: Pure parsing utilities for extraction, ranking, formatting, and nested JSON string detection.
+- `tests/jsonTools.test.js`: Local parser behavior tests using Node's built-in test runner.
+- `examples/screenshot-demo-input.txt`: Demo input for documentation screenshots.
+- `docs/images/`: README screenshot assets.
 
 ## Data Flow
 
 For pasted text:
 
-1. User enters text in the formatter tab.
+1. User enters text in the inspector tab.
 2. UI calls `extractJsonCandidates(input)`.
-3. Candidates are ranked by parse success, span size, structural depth, and whether the candidate starts as an object or array.
-4. The best candidate is selected by default.
-5. UI renders either raw parsed JSON or recursively expanded JSON depending on the current display mode.
+3. Parser scans balanced `{...}` and `[...]` ranges, parses valid ranges, filters contained ranges, scores candidates, and returns ranked candidates.
+4. UI selects the first candidate by default.
+5. UI renders the selected candidate as formatted JSON while preserving string values.
+6. If a string value contains parseable JSON, the output gutter shows a per-line expand control.
+7. Expanding the value renders a marked nested preview below the original line without altering copy output for the main JSON.
 
 For selected page text:
 
 1. User selects text on a web page.
-2. User chooses the context menu item.
-3. Background service worker stores the selected text in `chrome.storage.session` under a short-lived handoff key.
-4. Background service worker opens `formatter.html?source=selection`.
-5. Formatter tab reads the handoff text, populates the input pane, and runs extraction automatically.
+2. User chooses `Open selection in JSON Inspector`.
+3. Background service worker stores the selected text in `chrome.storage.session` under `selectedText`.
+4. Background service worker opens `src/formatter.html?source=selection`.
+5. Formatter tab reads the handoff text, clears it from session storage, populates the input pane, and runs extraction automatically.
 
 ## JSON Extraction Strategy
 
-The extractor scans the input character by character and records balanced `{...}` and `[...]` ranges. It tracks string state and escape characters so braces inside JSON strings do not break matching.
+The extractor scans the input character by character and starts an active scan at every `{` or `[`. Each active scan tracks:
 
-Each balanced range is parsed with `JSON.parse`. Invalid ranges are discarded. Valid ranges are returned with metadata:
+- start offset
+- stack of expected container boundaries
+- string state
+- escape state
+
+This lets the extractor recover valid candidates after invalid fragments and avoid treating braces inside strings as structural braces.
+
+Each valid candidate includes:
 
 - `id`
 - `start`
@@ -80,51 +125,63 @@ Each balanced range is parsed with `JSON.parse`. Invalid ranges are discarded. V
 - `score`
 - `summary`
 
-The first version focuses on valid JSON syntax. It will not attempt to repair non-standard JSON with comments, single quotes, or unquoted keys.
+Candidates contained entirely inside a larger valid candidate are filtered out before ranking.
 
 ## Nested JSON String Strategy
 
-Recursive mode walks parsed objects and arrays. When it encounters a string, it trims it and attempts `JSON.parse` only if it appears to be a JSON object or array string. If parsing succeeds, the parsed value is recursively processed. If parsing fails, the original string is preserved.
+The main output always preserves parsed JSON values as they are. If a value is a string, JSON Inspector checks whether the trimmed string looks like a JSON object or array. If it parses successfully, that line receives an expand control in the gutter.
 
-The original candidate remains available so the user can switch back to raw mode without data loss.
+Expanded nested previews are rendered as additional marked lines. They are inspectable and copyable, but they do not replace the original string value.
+
+This prevents the main output from changing semantic shape and keeps full-output copy predictable.
 
 ## UI Design
 
-The page uses a utilitarian two-pane layout:
+The page uses a dense, work-focused two-column layout:
 
-- Left pane: input textarea and small action bar.
-- Right pane: formatted output in a preformatted code viewer.
-- Candidate list: compact list showing detected candidates with type, range, and short summary.
-- Mode control: segmented control for Raw and Recursive.
-- Utility actions: format, clear, copy output.
-
-The UI should be dense and work-focused rather than decorative. It should handle long logs without layout shifting and keep controls usable on narrow screens.
+- Header: brand mark, `JSON Inspector`, status pill, and Clear action.
+- Left column: Input pane above Candidates.
+- Right column: Output pane only.
+- Layout ratio: approximately 4:6 between left and right.
+- Candidates: compact cards with active state and independent scrolling.
+- Output: dark code viewer with line numbers, sticky gutter, fold controls, nested expand controls, copy icons, wrap toggle, and full-output copy.
+- Tooltips: gutter button descriptions are rendered as fixed body-level overlays so they are not clipped by the output scroll container.
+- Page scrolling: disabled at the body level; input, output, and candidates scroll independently.
 
 ## Error Handling
 
-- No candidates: show a visible message and leave the output empty.
-- Invalid selected candidate: this should not happen because invalid ranges are filtered, but the UI should show an error if rendering fails.
-- Unparseable nested strings: preserve the original string.
-- Oversized input: continue processing synchronously for the first version; if performance becomes an issue, parsing can later move to a Web Worker.
+- Empty input: status is `Ready`, output is empty.
+- No valid JSON: status is `No valid JSON`, output is empty.
+- Render failure: status shows the error message when available.
+- Copy failure: status shows `Copy failed`.
+- Unparseable nested strings: leave the original string unchanged and do not show an expand control.
 
 ## Testing
 
-Parser tests should cover:
+Automated parser tests cover:
 
-- Plain JSON object.
-- Plain JSON array.
-- JSON surrounded by log text.
-- Multiple JSON candidates in one input.
+- JSON object extraction from log text.
+- Array extraction and multiple candidates.
 - Braces inside JSON strings.
-- Escaped nested JSON object string.
-- Escaped nested JSON array string.
 - Invalid fragments skipped while valid candidates remain.
-- Raw mode preserves string values.
-- Recursive mode expands nested JSON strings.
+- Recovery after unbalanced invalid fragments.
+- Recovery after invalid fragments with unmatched quotes.
+- Escaped nested JSON object string parsing.
+- Escaped nested JSON array string parsing.
+- Malformed nested JSON strings preserved.
+- Main formatting preserving nested JSON strings.
+- Nested JSON string detection for field-level expansion.
+- Preference for an outer array when it contains nested objects and JSON strings.
 
 Manual extension checks should cover:
 
 - Loading the unpacked extension in Chrome.
-- Opening the formatter from the extension icon.
-- Selecting text on a page and opening the formatter via context menu.
-- Copying formatted output.
+- Opening the inspector from the extension icon.
+- Opening selected page text through the context menu.
+- Pasting `examples/screenshot-demo-input.txt`.
+- Switching candidates.
+- Expanding nested JSON previews.
+- Folding object/array nodes.
+- Copying full output.
+- Copying individual nodes.
+- Toggling wrap/no-wrap mode.
