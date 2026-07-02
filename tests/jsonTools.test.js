@@ -60,3 +60,11 @@ test("recovers valid candidates after unbalanced invalid fragments", () => {
   assert.equal(candidates.length, 1);
   assert.deepEqual(candidates[0].parsed, { status: "ok" });
 });
+
+test("recovers valid candidates after invalid fragments with unmatched quotes", () => {
+  const input = 'bad {noise " good {"status":"ok"}';
+  const candidates = extractJsonCandidates(input);
+
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0].parsed, { status: "ok" });
+});

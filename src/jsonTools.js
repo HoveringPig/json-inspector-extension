@@ -24,48 +24,70 @@ export function formatJson(value) {
 
 function findBalancedJsonRanges(text) {
   const ranges = [];
-  const stack = [];
-  let inString = false;
-  let escaped = false;
+  let activeScans = [];
 
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
+    const nextScans = [];
 
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"' && stack.length > 0) {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{" || char === "[") {
-      stack.push({ char, start: index });
-      continue;
-    }
-
-    if (char === "}" || char === "]") {
-      if (stack.length === 0 || stack[stack.length - 1].char !== CLOSE_TO_OPEN[char]) {
-        stack.length = 0;
-        inString = false;
-        escaped = false;
+    for (const scan of activeScans) {
+      if (!advanceScan(scan, char)) {
         continue;
       }
 
-      const opening = stack.pop();
-      ranges.push({ start: opening.start, end: index + 1 });
+      if (scan.stack.length === 0) {
+        ranges.push({ start: scan.start, end: index + 1 });
+      } else {
+        nextScans.push(scan);
+      }
     }
+
+    if (char === "{" || char === "[") {
+      nextScans.push({
+        start: index,
+        stack: [char],
+        inString: false,
+        escaped: false,
+      });
+    }
+
+    activeScans = nextScans;
   }
 
   return ranges;
+}
+
+function advanceScan(scan, char) {
+  if (scan.inString) {
+    if (scan.escaped) {
+      scan.escaped = false;
+    } else if (char === "\\") {
+      scan.escaped = true;
+    } else if (char === '"') {
+      scan.inString = false;
+    }
+    return true;
+  }
+
+  if (char === '"') {
+    scan.inString = true;
+    return true;
+  }
+
+  if (char === "{" || char === "[") {
+    scan.stack.push(char);
+    return true;
+  }
+
+  if (char === "}" || char === "]") {
+    if (scan.stack[scan.stack.length - 1] !== CLOSE_TO_OPEN[char]) {
+      return false;
+    }
+
+    scan.stack.pop();
+  }
+
+  return true;
 }
 
 function isContainedInAnotherCandidate(candidate, candidates) {
