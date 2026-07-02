@@ -1,0 +1,21 @@
+2026-07-02 19:58:21 INFO trace=demo-7f31 payload={
+  "request_id": "req-demo-001",
+  "scene": "log-json-inspection",
+  "success": true,
+  "latency_ms": 128,
+  "owner": null,
+  "tags": ["log", "nested-json", "copy"],
+  "filters": {
+    "date": "2026-07-02",
+    "region": "north",
+    "enabled": null
+  },
+  "metrics": [
+    { "name": "orders", "value": 1024 },
+    { "name": "gmv", "value": 98342.75 }
+  ],
+  "nested_object": "{\"level\":\"warn\",\"retry\":2,\"detail\":{\"code\":\"E_JSON\",\"recoverable\":true}}",
+  "nested_array": "[{\"step\":\"extract\",\"ok\":true},{\"step\":\"format\",\"ok\":true}]",
+  "message": "Long text for wrap mode: pasted from logs with trace ids, business context, and enough length to verify wrapping in the output panel."
+} tail=ok
+2026-07-02 19:58:22 DEBUG candidates=[{"check":"second candidate","ok":true}]

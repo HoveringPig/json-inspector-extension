@@ -4,6 +4,16 @@ JSON Inspector is a lightweight Chrome extension for extracting, formatting, and
 
 It is designed for messy engineering workflows: paste a log line, response payload, copied console text, or selected page text, and the extension will find valid JSON candidates, render the selected candidate, and help inspect nested JSON strings without changing the original JSON structure.
 
+## Screenshots
+
+Expanded nested JSON preview:
+
+![JSON Inspector expanded nested JSON preview](docs/images/json-inspector-expanded-preview.png)
+
+Candidate switching:
+
+![JSON Inspector candidate switching](docs/images/json-inspector-candidate-switching.png)
+
 ## Features
 
 - Extract valid JSON objects and arrays from surrounding log text.
@@ -30,6 +40,16 @@ For example, this value remains a string in the main output:
 When a string value is recognized as JSON, the output gutter shows an expand control. Expanding it renders a marked preview below the original line, while the original output remains unchanged. This keeps copy results predictable and avoids changing the semantic structure of the source JSON.
 
 ## Usage
+
+### Screenshot demo input
+
+For screenshots or quick demos, copy the content from:
+
+```text
+examples/screenshot-demo-input.txt
+```
+
+It includes log text, multiple JSON candidates, nested JSON strings, arrays, primitives, wrapping text, and node-level copy/expand scenarios.
 
 ### Open the formatter
 
